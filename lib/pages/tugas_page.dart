@@ -12,6 +12,28 @@ class _TugasPageState extends State<TugasPage> {
   DateTime selectedDate = DateTime.now();
   Map<String, bool> taskCompletion = {}; // Menyimpan status tugas
 
+  // Data tugas
+  final List<Map<String, dynamic>> tugasTerdekat = [
+    {
+      "title": "Laporan Praktikum Basis Data",
+      "deadline": "Deadline: Hari Ini - 21:00",
+      "color": Colors.red,
+    },
+    {
+      "title": "Tugas Teknik Presentasi",
+      "deadline": "Deadline: Hari Ini - 23:59",
+      "color": Colors.orange,
+    },
+  ];
+
+  final List<Map<String, dynamic>> tugasMendatang = [
+    {
+      "title": "Laporan Kecerdasan Buatan",
+      "deadline": "Deadline: Minggu, 30 Maret - 23:59",
+      "color": Colors.yellow,
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +54,8 @@ class _TugasPageState extends State<TugasPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool semuaKosong = tugasTerdekat.isEmpty && tugasMendatang.isEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Tugas", style: TextStyle(color: Colors.white)),
@@ -55,13 +79,29 @@ class _TugasPageState extends State<TugasPage> {
             SizedBox(height: 16),
             _buildDateSelector(),
             SizedBox(height: 20),
-            _buildTaskSection("Tugas Mendatang", [
-              _buildTaskCard("Laporan Praktikum Basis Data", "Deadline: Hari Ini - 21:00", Colors.red),
-              _buildTaskCard("Tugas Teknik Presentasi", "Deadline: Hari Ini - 23:59", Colors.orange),
-            ]),
-            _buildTaskSection("Tugas Mendatang", [
-              _buildTaskCard("Laporan Kecerdasan Buatan", "Deadline: Minggu, 30 Maret - 23:59", Colors.yellow),
-            ]),
+            Expanded(
+              child: semuaKosong
+                  ? _buildEmptyTask("Tidak ada tugas")
+                  : ListView(
+                      children: [
+                        if (tugasTerdekat.isNotEmpty)
+                          _buildTaskSection(
+                            "Tugas Terdekat",
+                            tugasTerdekat.map((task) => _buildTaskCard(task)).toList(),
+                          ),
+                        if (tugasMendatang.isNotEmpty)
+                          _buildTaskSection(
+                            "Tugas Mendatang",
+                            tugasMendatang.map((task) => _buildTaskCard(task)).toList(),
+                          ),
+                        if (tugasMendatang.isEmpty)
+                          _buildTaskSection(
+                            "Tugas Mendatang",
+                            [_buildEmptyTask("Tidak ada tugas mendatang")],
+                          ),
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
@@ -115,9 +155,9 @@ class _TugasPageState extends State<TugasPage> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: isSelected ? Colors.blue : Colors.white,
+                color: isSelected ? Color(0xFF0E1836) : Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? Colors.blue : Colors.grey),
+                border: Border.all(color: isSelected ? Color(0xFF0E1836) : Colors.grey),
               ),
               child: Center(
                 child: Text(
@@ -151,14 +191,18 @@ class _TugasPageState extends State<TugasPage> {
       children: [
         Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         SizedBox(height: 8),
-        ...tasks,
+        Column(children: tasks),
         SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildTaskCard(String title, String deadline, Color borderColor) {
-    taskCompletion.putIfAbsent(title, () => false); // Default tugas belum dicentang
+  Widget _buildTaskCard(Map<String, dynamic> task) {
+    String title = task['title'];
+    String deadline = task['deadline'];
+    Color borderColor = task['color'];
+
+    taskCompletion.putIfAbsent(title, () => false);
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -203,6 +247,21 @@ class _TugasPageState extends State<TugasPage> {
             style: TextStyle(color: borderColor, fontSize: 12, fontWeight: FontWeight.bold),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyTask(String message) {
+    return Center(
+      child: Column(
+        children: [
+          Icon(Icons.assignment_turned_in, size: 80, color: Colors.grey[400]),
+          SizedBox(height: 8),
+          Text(
+            message,
+            style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }

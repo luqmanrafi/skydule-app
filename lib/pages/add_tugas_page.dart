@@ -37,7 +37,7 @@ class _AddTugasPageState extends State<AddTugasPage> {
                 children: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: const Color.fromARGB(255, 95, 129, 158),
                       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                     onPressed: _addNewForm,
@@ -45,7 +45,7 @@ class _AddTugasPageState extends State<AddTugasPage> {
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: const Color.fromARGB(255, 59, 100, 60),
                       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                     onPressed: () {},

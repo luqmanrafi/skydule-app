@@ -46,8 +46,8 @@ class _AddJadwalPageState extends State<AddJadwalPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildButton("Tambah", Colors.blue, _addNewForm),
-                  _buildButton("Simpan", Colors.green, _saveJadwal),
+                  _buildButton("Tambah", const Color.fromARGB(255, 95, 129, 158), _addNewForm),
+                  _buildButton("Simpan", const Color.fromARGB(255, 59, 100, 60), _saveJadwal),
                 ],
               ),
             ],
@@ -134,7 +134,7 @@ class _JadwalFormState extends State<JadwalForm> {
           }),
           SizedBox(height: 10),
           Text("Jadwal Perkuliahan", style: TextStyle(fontWeight: FontWeight.bold)),
-          _buildDropdown("Hari", ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"], (value) {
+          _buildDropdown("Hari", ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"], (value) {
             setState(() {
               selectedDay = value;
             });
@@ -223,14 +223,14 @@ class _JadwalFormState extends State<JadwalForm> {
           child: Container(
             padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             decoration: BoxDecoration(
-              color: reminders[index] ? Colors.blue : Colors.white,
-              border: Border.all(color: Colors.blue),
+              color: reminders[index] ? const Color.fromARGB(255, 95, 129, 158) : Colors.white,
+              border: Border.all(color: const Color.fromARGB(255, 95, 129, 158)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               options[index],
               style: TextStyle(
-                color: reminders[index] ? Colors.white : Colors.blue,
+                color: reminders[index] ? Colors.white : const Color.fromARGB(255, 95, 129, 158),
                 fontSize: 14,
               ),
             ),
