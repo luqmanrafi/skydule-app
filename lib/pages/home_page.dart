@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../widgets/task_card.dart';
+import '../models/matakuliah.dart'; 
+import '../services/api_service.dart'; 
 
 final List<Map<String, dynamic>> jadwalHariIni = [
   {"title": "Kecerdasan Buatan", "time": "08:00 - 10:00"},
@@ -20,6 +22,8 @@ class _HomePageState extends State<HomePage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
+  late Future<List<Matakuliah>> futureMatakuliah;
+
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     setState(() {
       _selectedDay = selectedDay;
@@ -37,58 +41,95 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    bool jadwalKosong = jadwalHariIni.isEmpty;
-    bool tugasKosong = tugasHariIni.isEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        children: [
-          _buildCalendar(),
-
-          SizedBox(height: 20),
-
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              "Jadwal Hari Ini",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E2A47),
-              ),
-            ),
-          ),
-
-          SizedBox(height: 16),
-
-          Expanded(
-            child: (jadwalKosong && tugasKosong)
-                ? Center(child: Text("Tidak ada jadwal hari ini"))
-                : ListView(
-                    children: [
-                      if (!jadwalKosong) ...[
-                        ...jadwalHariIni.map((jadwal) => TaskCard(
-                              title: jadwal["title"],
-                              time: jadwal["time"],
-                              isTask: false,
-                            )),
-                      ],
-                      if (!tugasKosong) ...[
-                        ...tugasHariIni.map((tugas) => TaskCard(
-                              title: tugas["title"],
-                              time: "Deadline: ${tugas["deadline"]}",
-                              isTask: true,
-                            )),
-                      ],
-                    ],
-                  ),
-          ),
-        ],
-      ),
-    );
+  void initState() {
+  super.initState();
+  futureMatakuliah = ApiService.fetchMatakuliah();
   }
+  
+  @override
+Widget build(BuildContext context) {
+  bool jadwalKosong = jadwalHariIni.isEmpty;
+  bool tugasKosong = tugasHariIni.isEmpty;
+
+  return SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCalendar(),
+
+        SizedBox(height: 20),
+
+        Text(
+          "Jadwal Hari Ini",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E2A47),
+          ),
+        ),
+
+        SizedBox(height: 16),
+
+        if (jadwalKosong && tugasKosong)
+          Center(child: Text("Tidak ada jadwal hari ini"))
+        else ...[
+          if (!jadwalKosong)
+            ...jadwalHariIni.map((jadwal) => TaskCard(
+                  title: jadwal["title"],
+                  time: jadwal["time"],
+                  isTask: false,
+                )),
+          if (!tugasKosong)
+            ...tugasHariIni.map((tugas) => TaskCard(
+                  title: tugas["title"],
+                  time: "Deadline: ${tugas["deadline"]}",
+                  isTask: true,
+                )),
+        ],
+
+        SizedBox(height: 24),
+
+        Text(
+          "Daftar Matakuliah",
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E2A47),
+          ),
+        ),
+
+        SizedBox(height: 8),
+
+        FutureBuilder<List<Matakuliah>>(
+          future: futureMatakuliah,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Text('Gagal memuat data: ${snapshot.error}');
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Text('Tidak ada data matakuliah.');
+            } else {
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) {
+                  final mk = snapshot.data![index];
+                  return ListTile(
+                    title: Text(mk.namaMatakuliah),
+              
+                  );
+                },
+              );
+            }
+          },
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCalendar() {
     return Container(
@@ -126,7 +167,7 @@ class _HomePageState extends State<HomePage> {
                     icon: Icon(Icons.chevron_right, color: Color(0xFF1E2A47)),
                     onPressed: () => _changeMonth(true),
                   ),
-                ],
+                ], 
               ),
             ],
           ),
