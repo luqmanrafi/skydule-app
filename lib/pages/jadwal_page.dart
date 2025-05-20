@@ -1,96 +1,95 @@
 import 'package:flutter/material.dart';
-import '../home_screen.dart'; 
+import '../home_screen.dart';
+import '../models/matakuliah.dart';
+import '../services/api_service.dart';
 
-class JadwalPage extends StatelessWidget {
-  // Data jadwal
-  final Map<String, List<Map<String, dynamic>>> jadwal = {
-    "Senin": [
-      {
-        "title": "Kecerdasan Buatan",
-        "time": "08:00 - 09:40",
-        "location": "LA - K.203",
-        "color": Colors.red,
-        "type": "Teori",
-      },
-      {
-        "title": "Workshop Administrasi Jaringan",
-        "time": "10:30 - 13:10",
-        "location": "LA - K.205",
-        "color": Colors.green,
-        "type": "Praktikum",
-      },
-    ],
-    "Selasa": [
-      {
-        "title": "Workshop Administrasi Basis Data",
-        "time": "10:30 - 13:10",
-        "location": "LA - K.205",
-        "color": Colors.green,
-        "type": "Praktikum",
-      },
-      {
-        "title": "Workshop Aplikasi dan Komputasi Awan",
-        "time": "14:00 - 16:40",
-        "location": "LA - K.205",
-        "color": Colors.green,
-        "type": "Praktikum",
-      },
-    ],
-    "Rabu": [
-      {
-        "title": "Kecerdasan Buatan",
-        "time": "08:00 - 09:40",
-        "location": "LA - K.203",
-        "color": Colors.red,
-        "type": "Teori",
-      },
-    ],
-  };
+class JadwalPage extends StatefulWidget {
+  @override
+  _JadwalPageState createState() => _JadwalPageState();
+}
+
+class _JadwalPageState extends State<JadwalPage> {
+  Map<String, List<Matakuliah>> jadwalByHari = {};
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchJadwal();
+  }
+
+  Future<void> fetchJadwal() async {
+    try {
+      List<Matakuliah> semuaMatkul = await ApiService.fetchMatakuliah();
+      Map<String, List<Matakuliah>> grouped = {};
+
+      for (var matkul in semuaMatkul) {
+        grouped.putIfAbsent(matkul.hari, () => []).add(matkul);
+      }
+
+      setState(() {
+        jadwalByHari = grouped;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Gagal fetch jadwal: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    bool isEmpty = jadwal.values.every((list) => list.isEmpty);
-
+    final List<String> urutanHari = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "Jadwal",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: Text("Jadwal", style: TextStyle(color: Colors.white)),
         backgroundColor: Color(0xFF0E1836),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-            );
+            Navigator.pop(context);
           },
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: isEmpty
-            ? _buildEmptySchedule()
-            : ListView(
-                children: jadwal.entries.map((entry) {
-                  return _buildDaySection(
-                    entry.key,
-                    entry.value.map((item) {
-                      return _buildScheduleCard(
-                        item['title'],
-                        item['time'],
-                        item['location'],
-                        item['color'],
-                        item['type'],
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : jadwalByHari.isEmpty
+              ? _buildEmptySchedule()
+              : Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: ListView(
+                    children: urutanHari
+                        .where((hari) => jadwalByHari.containsKey(hari))
+                        .map((hari) {
+                      return _buildDaySection(
+                        hari,
+                        jadwalByHari[hari]!.map((item) {
+                          return _buildScheduleCard(
+                            item.namaMatakuliah,
+                            "${item.jamMulai} - ${item.jamSelesai}",
+                            item.ruangan,
+                            _getColorByType(item.jenisMatakuliah),
+                            item.jenisMatakuliah,
+                          );
+                        }).toList(),
                       );
                     }).toList(),
-                  );
-                }).toList(),
-              ),
-      ),
+                  ),
+                ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          // Tambahkan logika untuk tambah jadwal di sini
+        },
         backgroundColor: Color(0xFF0E1836),
         shape: CircleBorder(),
         child: Icon(Icons.add, color: Colors.white),
@@ -147,5 +146,16 @@ class JadwalPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color _getColorByType(String jenisMatakuliah) {
+    switch (jenisMatakuliah.toLowerCase()) {
+      case 'praktikum':
+        return Colors.green;
+      case 'teori':
+        return Colors.red;
+      default:
+        return Colors.blueGrey;
+    }
   }
 }

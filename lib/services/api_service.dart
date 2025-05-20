@@ -4,10 +4,10 @@ import '../models/matakuliah.dart';
 
 class ApiService {
   
-  static const String baseUrl = 'https://42f0-36-79-111-120.ngrok-free.app/matakuliah';
-
+  static const String baseUrl = 'http://3.1.95.240/api';
   static Future<List<Matakuliah>> fetchMatakuliah() async {
-    final url = Uri.parse('$baseUrl');
+    final url = Uri.parse('$baseUrl/matakuliah');
+    final urlTugas = Uri.parse('$baseUrl/tugas');
 
     try {
       final response = await http.get(
