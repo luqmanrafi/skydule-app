@@ -31,4 +31,15 @@ class Matakuliah {
       ruangan: json['ruangan'],
     );
   }
+  Map<String, dynamic> toJson(){
+    return {
+      'nama_matakuliah': namaMatakuliah,
+      'dosen_pengajar': dosenPengajar,
+      'jenis_matakuliah': jenisMatakuliah,
+      'hari': hari,
+      'jam_mulai': jamMulai,
+      'jam_selesai': jamSelesai,
+      'ruangan': ruangan,
+    };
+  }
 }

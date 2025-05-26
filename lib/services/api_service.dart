@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import '../models/matakuliah.dart';
 
 class ApiService {
-  
   static const String baseUrl = 'http://3.1.95.240/api';
+
+  // Fungsi untuk mengambil data matakuliah dari server
   static Future<List<Matakuliah>> fetchMatakuliah() async {
     final url = Uri.parse('$baseUrl/matakuliah');
     final urlTugas = Uri.parse('$baseUrl/tugas');
@@ -14,6 +15,7 @@ class ApiService {
         url,
         headers: {
           'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
         },
       );
 
@@ -33,6 +35,33 @@ class ApiService {
     } catch (e) {
       print('Error fetching data: $e');
       rethrow;
+    }
+  }
+
+  static Future<bool> createMatakuliah(Matakuliah matakuliah) async {
+    final url = Uri.parse('$baseUrl/matakuliah');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+
+        },
+          body: jsonEncode(matakuliah.toJson()),
+      );
+      print("Response body: ${response.body}");
+      if (response.statusCode == 201 || response.statusCode == 200){
+        print("Matakuliah berhasil dibuat");
+        return true;
+      } else {
+        print("Status create: ${response.statusCode}");
+        print("Body create: ${response.body}");
+        return false;
+      }
+    } catch (e){
+      print("Terjadi kesalahan saat membuat matakuliah: $e");
+      return false;
     }
   }
 }

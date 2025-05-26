@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:skydule_app/models/matakuliah.dart';
+import '../services/api_service.dart';
+
 
 class AddJadwalPage extends StatefulWidget {
   @override
@@ -6,25 +9,147 @@ class AddJadwalPage extends StatefulWidget {
 }
 
 class _AddJadwalPageState extends State<AddJadwalPage> {
-  List<JadwalForm> jadwalForms = [JadwalForm(key: UniqueKey(), onRemove: () {})];
-
-  void _addNewForm() {
+  List<GlobalKey<_JadwalFormState>> _formKeys = [GlobalKey<_JadwalFormState>()];
+  List<Widget> _buildJadwalForm(){
+    return _formKeys
+        .asMap()
+        .map((index, key) => MapEntry(
+          index,
+          JadwalForm(
+            key: key,
+            onRemove: () => _removeForm(index),
+          )))
+        .values
+        .toList();
+  }
+  void _addNewForm(){
     setState(() {
-      jadwalForms.add(JadwalForm(
-        key: UniqueKey(),
-        onRemove: () {
-          setState(() {
-            jadwalForms.removeLast();
-          });
-        },
-      ));
+      _formKeys.add(GlobalKey<_JadwalFormState>());
     });
   }
 
-  void _saveJadwal() {
-    print("Jadwal Disimpan!");
+  void _removeForm(int index){
+    setState(() {
+      if (_formKeys.length>1){
+        _formKeys.removeAt(index);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Harus ada setidaknya 1 form.")),
+        );
+      }
+    });
   }
 
+  // Di dalam class _AddJadwalPageState di file lib/pages/add_jadwal_page.dart
+
+  Future<void> _saveJadwal() async {
+    bool allFormsValid = true;
+    List<Matakuliah> matakuliahList = [];
+
+    if (_formKeys.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tidak ada data jadwal untuk disimpan.')),
+      );
+      return;
+    }
+
+    for (var key in _formKeys) {
+      final formState = key.currentState;
+      if (formState == null) {
+        print("Error: Form state is null for one of the forms. Skipping.");
+        allFormsValid = false;
+        continue;
+      }
+
+      final Map<String, dynamic>? data = formState.getJadwalData();
+
+      if (data == null) {
+        print("Error: getJadwalData() returned null for one of the forms. Skipping.");
+        allFormsValid = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ada form yang datanya tidak lengkap/valid.')),
+        );
+        continue;
+      }
+
+      print('--- DEBUG: Data dari getJadwalData() untuk satu form ---');
+      data.forEach((key, value) {
+        print('$key: $value (Tipe: ${value.runtimeType})');
+      });
+      print('--- AKHIR DEBUG DATA ---');
+
+      String namaMatakuliah = data['namaMatakuliah']?.toString() ?? '';
+      String dosenPengajar = data['dosenPengajar']?.toString() ?? '';
+      String jenisMatakuliah = data['jenisMatakuliah']?.toString() ?? 'Teori';
+      String hari = data['hari']?.toString() ?? 'Senin';
+      String jamMulai = data['jamMulai']?.toString() ?? '08:00';
+      String jamSelesai = data['jamSelesai']?.toString() ?? '09:40';
+      String ruangan = data['ruangan']?.toString() ?? '';
+
+      final matakuliah = Matakuliah(
+        idMatakuliah: '',
+        namaMatakuliah: namaMatakuliah,
+        dosenPengajar: dosenPengajar,
+        jenisMatakuliah: jenisMatakuliah,
+        hari: hari,
+        jamMulai: jamMulai,
+        jamSelesai: jamSelesai,
+        ruangan: ruangan,
+      );
+      matakuliahList.add(matakuliah);
+    }
+
+    if (!allFormsValid) {
+      print("Proses simpan dibatalkan karena ada form yang tidak valid atau data null.");
+      return;
+    }
+
+    if (matakuliahList.isEmpty && _formKeys.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memproses data dari form.')),
+      );
+      // if (Navigator.of(context).canPop()) Navigator.of(context).pop(); // Dismiss loading
+      return;
+    }
+
+
+    // Kirim semua matakuliah yang valid ke API
+    int successCount = 0;
+    bool anyFailed = false;
+
+    for (var matkul in matakuliahList) {
+      print('--- MENGIRIM MATAKULIAH KE API ---');
+      print('Data yang dikirim (setelah toJson akan menghilangkan id jika di-setting): ${matkul.toJson()}'); // Cetak apa yang akan di-encode
+      bool success = await ApiService.createMatakuliah(matkul);
+      if (success) {
+        successCount++;
+      } else {
+        anyFailed = true;
+      }
+    }
+
+    // Dismiss loading indicator jika ada
+    // if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+
+    // Tampilkan feedback berdasarkan hasil
+    if (successCount == matakuliahList.length && !anyFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Semua (${matakuliahList.length}) jadwal berhasil disimpan!')),
+      );
+      if(mounted) {
+        Navigator.pop(context, true);
+      }// Kembali dan tandai ada perubahan
+    } else if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$successCount jadwal berhasil disimpan, namun ada yang gagal.')),
+      );
+    } else if (matakuliahList.isNotEmpty) { // Hanya tampilkan gagal total jika memang ada data yang coba dikirim
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan semua jadwal. Coba lagi.')),
+      );
+    }
+    // Jika matakuliahList kosong tapi _formKeys tidak, pesan error sudah ditangani di atas
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,7 +166,7 @@ class _AddJadwalPageState extends State<AddJadwalPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              ...jadwalForms,
+              ..._buildJadwalForm(),
               SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -79,27 +204,51 @@ class JadwalForm extends StatefulWidget {
 }
 
 class _JadwalFormState extends State<JadwalForm> {
+  final _namaMatkulController = TextEditingController();
+  final _dosenPengajarController = TextEditingController();
+  final _ruanganController = TextEditingController();
+
   String? selectedDay;
   String? selectedType;
   TimeOfDay startTime = TimeOfDay(hour: 8, minute: 0);
   TimeOfDay endTime = TimeOfDay(hour: 9, minute: 40);
   List<bool> reminders = [true, false, false];
 
-  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: isStartTime ? startTime : endTime,
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStartTime) {
-          startTime = picked;
-        } else {
-          endTime = picked;
-        }
-      });
+
+    @override
+    void dispose(){
+      _namaMatkulController.dispose();
+      _dosenPengajarController.dispose();
+      _ruanganController.dispose();
+      super.dispose();
     }
-  }
+
+    Map<String, dynamic>getJadwalData() {
+      return{
+        'namaMatakuliah': _namaMatkulController.text,
+        'dosenPengajar': _dosenPengajarController.text,
+        'jenisMatakuliah': selectedType,
+        'hari': selectedDay,
+        'jamMulai': "${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}",
+        'jamSelesai': "${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}",
+        'ruangan': _ruanganController.text,
+      };
+    }
+    Future<void>_selectTime(BuildContext context, bool isStartTime)async{
+      final TimeOfDay? picked = await showTimePicker(
+        context: context,
+        initialTime: isStartTime ? startTime : endTime,
+      );
+      if (picked != null) {
+        setState(() {
+          if (isStartTime) {
+            startTime = picked;
+          } else {
+            endTime = picked;
+          }
+        });
+      }
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -125,8 +274,8 @@ class _JadwalFormState extends State<JadwalForm> {
               ),
             ],
           ),
-          _buildTextField("Nama Mata Kuliah", "Masukkan nama mata kuliah"),
-          _buildTextField("Dosen Pengajar", "Masukkan nama dosen"),
+          _buildTextField("Nama Mata Kuliah", "Masukkan nama mata kuliah", _namaMatkulController),
+          _buildTextField("Dosen Pengajar", "Masukkan nama dosen", _dosenPengajarController),
           _buildDropdown("Jenis Mata Kuliah", ["Teori", "Praktikum"], (value) {
             setState(() {
               selectedType = value;
@@ -140,19 +289,20 @@ class _JadwalFormState extends State<JadwalForm> {
             });
           }),
           _buildTimePicker("Waktu Kuliah", startTime, endTime),
-          _buildTextField("Tempat Perkuliahan", "Contoh: PSDKU - L.A - 203"),
+          _buildTextField("Tempat Perkuliahan", "Contoh: PSDKU - L.A - 203", _ruanganController),
           SizedBox(height: 10),
-          Text("Pengingat", style: TextStyle(fontWeight: FontWeight.bold)),
-          _buildReminderSelection(),
+          // Text("Pengingat", style: TextStyle(fontWeight: FontWeight.bold)),
+          // _buildReminderSelection(),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, String hint) {
+  Widget _buildTextField(String label, String hint, TextEditingController controller) {
     return Padding(
       padding: EdgeInsets.only(bottom: 10),
       child: TextField(
+        controller: controller,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,

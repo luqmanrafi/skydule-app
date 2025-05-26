@@ -4,6 +4,7 @@ import '../models/matakuliah.dart';
 import '../services/api_service.dart';
 
 class JadwalPage extends StatefulWidget {
+  const JadwalPage({Key? key}) : super(key: key);
   @override
   _JadwalPageState createState() => _JadwalPageState();
 }
@@ -64,28 +65,28 @@ class _JadwalPageState extends State<JadwalPage> {
       body: isLoading
           ? Center(child: CircularProgressIndicator())
           : jadwalByHari.isEmpty
-              ? _buildEmptySchedule()
-              : Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: ListView(
-                    children: urutanHari
-                        .where((hari) => jadwalByHari.containsKey(hari))
-                        .map((hari) {
-                      return _buildDaySection(
-                        hari,
-                        jadwalByHari[hari]!.map((item) {
-                          return _buildScheduleCard(
-                            item.namaMatakuliah,
-                            "${item.jamMulai} - ${item.jamSelesai}",
-                            item.ruangan,
-                            _getColorByType(item.jenisMatakuliah),
-                            item.jenisMatakuliah,
-                          );
-                        }).toList(),
-                      );
-                    }).toList(),
-                  ),
-                ),
+          ? _buildEmptySchedule()
+          : Padding(
+        padding: EdgeInsets.all(16.0),
+        child: ListView(
+          children: urutanHari
+              .where((hari) => jadwalByHari.containsKey(hari))
+              .map((hari) {
+            return _buildDaySection(
+              hari,
+              jadwalByHari[hari]!.map((item) {
+                return _buildScheduleCard(
+                  item.namaMatakuliah,
+                  "${item.jamMulai} - ${item.jamSelesai}",
+                  item.ruangan,
+                  _getColorByType(item.jenisMatakuliah),
+                  item.jenisMatakuliah,
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // Tambahkan logika untuk tambah jadwal di sini
