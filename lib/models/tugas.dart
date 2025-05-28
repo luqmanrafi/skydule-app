@@ -1,31 +1,24 @@
-class Matakuliah {
+class Tugas {
   final String namaMatakuliah;
   final String judulTugas;
-  final String deadlineTugas;
   final String deskripsiTugas;
+  final DateTime deadline;
 
-  Matakuliah({
+  Tugas({
     required this.namaMatakuliah,
     required this.judulTugas,
-    required this.deadlineTugas,
     required this.deskripsiTugas,
+    required this.deadline,
   });
 
-  factory Matakuliah.fromJson(Map<String, dynamic> json) {
-    return Matakuliah(
-      namaMatakuliah: json['nama_matakuliah'],
-      judulTugas: json['judul_tugas'],
-      deadlineTugas: json['deadline_tugas'],
-      deskripsiTugas: json['deskripsi_tugas'],
+  factory Tugas.fromJson(Map<String, dynamic> json) {
+    return Tugas(
+      namaMatakuliah: json['nama_matakuliah'] ?? '',
+      judulTugas: json['judul_tugas'] ?? '',
+      deskripsiTugas: json['deskripsi_tugas'] ?? '',
+      deadline: (json['deadline_tugas'] != null)
+          ? DateTime.parse(json['deadline_tugas'])
+          : DateTime(2100), // Atau fallback date lain
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'nama_matakuliah': namaMatakuliah,
-      'judul_tugas': judulTugas,
-      'deadline_tugas': deadlineTugas,
-      'deskripsi_tugas': deskripsiTugas,
-    };
   }
 }
