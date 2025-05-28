@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import '../home_screen.dart';
+import '../models/tugas.dart';
+import '../services/api_service.dart';
 
 class TugasPage extends StatefulWidget {
   @override
@@ -9,259 +10,233 @@ class TugasPage extends StatefulWidget {
 }
 
 class _TugasPageState extends State<TugasPage> {
+  List<Tugas> tugasList = [];
+  bool isLoading = true;
+  Map<String, bool> taskCompletion = {};
   DateTime selectedDate = DateTime.now();
-  Map<String, bool> taskCompletion = {}; // Menyimpan status tugas
-
-  // Data tugas
-  final List<Map<String, dynamic>> tugasTerdekat = [
-    {
-      "title": "Laporan Praktikum Basis Data",
-      "deadline": "Deadline: Hari Ini - 21:00",
-      "color": Colors.red,
-    },
-    {
-      "title": "Tugas Teknik Presentasi",
-      "deadline": "Deadline: Hari Ini - 23:59",
-      "color": Colors.orange,
-    },
-  ];
-
-  final List<Map<String, dynamic>> tugasMendatang = [
-    {
-      "title": "Laporan Kecerdasan Buatan",
-      "deadline": "Deadline: Minggu, 30 Maret - 23:59",
-      "color": Colors.yellow,
-    },
-  ];
+  List<DateTime> visibleDates = [];
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('id_ID', null);
+    fetchTugas();
+    generateVisibleDates(selectedDate);
   }
 
-  void _previousMonth() {
+  Future<void> fetchTugas() async {
+    try {
+      final data = await ApiService.fetchTugas();
+      setState(() {
+        tugasList = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error mengambil tugas: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void generateVisibleDates(DateTime baseDate) {
+    visibleDates = List.generate(7, (i) => baseDate.add(Duration(days: i - 3)));
+  }
+
+  void _previousDay() {
     setState(() {
-      selectedDate = DateTime(selectedDate.year, selectedDate.month - 1, selectedDate.day);
+      selectedDate = selectedDate.subtract(Duration(days: 1));
+      generateVisibleDates(selectedDate);
     });
   }
 
-  void _nextMonth() {
+  void _nextDay() {
     setState(() {
-      selectedDate = DateTime(selectedDate.year, selectedDate.month + 1, selectedDate.day);
+      selectedDate = selectedDate.add(Duration(days: 1));
+      generateVisibleDates(selectedDate);
     });
+  }
+
+  bool isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   @override
   Widget build(BuildContext context) {
-    bool semuaKosong = tugasTerdekat.isEmpty && tugasMendatang.isEmpty;
+    final filteredTugas = tugasList.where((tugas) => isSameDate(tugas.deadline, selectedDate)).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Tugas", style: TextStyle(color: Colors.white)),
-        backgroundColor: Color(0xFF0E1836),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-            );
-          },
-        ),
+     appBar: AppBar(
+      title: Text('Tugas'),
+      backgroundColor: Color(0xFF0E1836),
+      foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMonthSelector(),
-            SizedBox(height: 16),
-            _buildDateSelector(),
-            SizedBox(height: 20),
-            Expanded(
-              child: semuaKosong
-                  ? _buildEmptyTask("Tidak ada tugas")
-                  : ListView(
-                      children: [
-                        if (tugasTerdekat.isNotEmpty)
-                          _buildTaskSection(
-                            "Tugas Terdekat",
-                            tugasTerdekat.map((task) => _buildTaskCard(task)).toList(),
-                          ),
-                        if (tugasMendatang.isNotEmpty)
-                          _buildTaskSection(
-                            "Tugas Mendatang",
-                            tugasMendatang.map((task) => _buildTaskCard(task)).toList(),
-                          ),
-                        if (tugasMendatang.isEmpty)
-                          _buildTaskSection(
-                            "Tugas Mendatang",
-                            [_buildEmptyTask("Tidak ada tugas mendatang")],
-                          ),
-                      ],
+
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                SizedBox(height: 12),
+                _buildHeaderNavigator(),
+                _buildDateSelector(),
+                if (!isSameDate(selectedDate, DateTime.now()))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          selectedDate = DateTime.now();
+                          generateVisibleDates(selectedDate);
+                        });
+                      },
+                      child: Text('Tampilkan Tugas Hari Ini'),
                     ),
-            ),
-          ],
+                  ),
+                Expanded(
+                  child: (filteredTugas.isEmpty)
+                      ? Center(child: Text('Tidak ada tugas pada hari ini.'))
+                      : ListView.builder(
+                          itemCount: filteredTugas.length,
+                          itemBuilder: (context, index) {
+                            final tugas = filteredTugas[index];
+                            final formattedDeadline = DateFormat("EEEE, dd MMMM yyyy", "id_ID")
+                                .format(tugas.deadline);
+
+                            return Card(
+  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  elevation: 2,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  child: ListTile(
+    leading: GestureDetector(
+      onTap: () {
+        setState(() {
+          taskCompletion[tugas.judulTugas] = !(taskCompletion[tugas.judulTugas] ?? false);
+        });
+      },
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: taskCompletion[tugas.judulTugas] == true ? Colors.green : Colors.grey,
+            width: 2,
+          ),
+          color: taskCompletion[tugas.judulTugas] == true ? Colors.green : Colors.transparent,
+        ),
+        child: taskCompletion[tugas.judulTugas] == true
+            ? Icon(Icons.check, color: Colors.white, size: 18)
+            : null,
+      ),
+    ),
+    title: Text(
+      tugas.judulTugas,
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        decoration: taskCompletion[tugas.judulTugas] == true
+            ? TextDecoration.lineThrough
+            : TextDecoration.none,
+        color: taskCompletion[tugas.judulTugas] == true ? Colors.grey : Colors.black,
+      ),
+    ),
+    subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Mata Kuliah: ${tugas.namaMatakuliah}'),
+        Text('Deadline: $formattedDeadline'),
+      ],
+    ),
+    trailing: Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue),
+      ),
+      child: Text(
+        'To-Do',
+        style: TextStyle(
+          color: Colors.blue,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
         ),
       ),
+    ),
+  ),
+);
+
+                          },
+                        ),
+                ),
+              ],
+            ),
     );
   }
 
-  Widget _buildMonthSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          DateFormat("MMMM yyyy", 'id_ID').format(selectedDate),
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: Icon(Icons.chevron_left, size: 24, color: Colors.black),
-              onPressed: _previousMonth,
-            ),
-            IconButton(
-              icon: Icon(Icons.chevron_right, size: 24, color: Colors.black),
-              onPressed: _nextMonth,
-            ),
-          ],
-        ),
-      ],
+  Widget _buildHeaderNavigator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            DateFormat("EEEE, dd MMMM yyyy", "id_ID").format(selectedDate),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Row(
+            children: [
+              IconButton(icon: Icon(Icons.chevron_left), onPressed: _previousDay),
+              IconButton(icon: Icon(Icons.chevron_right), onPressed: _nextDay),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildDateSelector() {
-    List<String> days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
-    DateTime firstDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day - selectedDate.weekday + 1);
-    List<Widget> dateWidgets = [];
+    List<String> days = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
-    for (int i = 0; i < 7; i++) {
-      DateTime currentDate = firstDay.add(Duration(days: i));
-      bool isSelected = currentDate.day == selectedDate.day;
-
-      dateWidgets.add(Column(
-        children: [
-          Text(days[i], style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          SizedBox(height: 4),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedDate = currentDate;
-              });
-            },
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isSelected ? Color(0xFF0E1836) : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? Color(0xFF0E1836) : Colors.grey),
-              ),
-              child: Center(
-                child: Text(
-                  currentDate.day.toString(),
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: visibleDates.map((date) {
+          bool isSelected = isSameDate(date, selectedDate);
+          return Column(
+            children: [
+              Text(days[date.weekday % 7], style: TextStyle(fontSize: 14)),
+              SizedBox(height: 4),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    selectedDate = date;
+                    generateVisibleDates(selectedDate);
+                  });
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isSelected ? Color(0xFF0E1836) : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? Color(0xFF0E1836) : Colors.grey,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${date.day}',
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ));
-    }
-
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 5)],
-      ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: dateWidgets),
-    );
-  }
-
-  Widget _buildTaskSection(String title, List<Widget> tasks) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        SizedBox(height: 8),
-        Column(children: tasks),
-        SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildTaskCard(Map<String, dynamic> task) {
-    String title = task['title'];
-    String deadline = task['deadline'];
-    Color borderColor = task['color'];
-
-    taskCompletion.putIfAbsent(title, () => false);
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: ListTile(
-        leading: GestureDetector(
-          onTap: () {
-            setState(() {
-              taskCompletion[title] = !(taskCompletion[title] ?? false);
-            });
-          },
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: borderColor, width: 2),
-              color: taskCompletion[title]! ? borderColor : Colors.transparent,
-            ),
-            child: taskCompletion[title]!
-                ? Icon(Icons.check, color: Colors.white, size: 18)
-                : null,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            decoration: taskCompletion[title]! ? TextDecoration.lineThrough : TextDecoration.none,
-            color: taskCompletion[title]! ? Colors.grey : Colors.black,
-          ),
-        ),
-        subtitle: Text(deadline),
-        trailing: Container(
-          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            border: Border.all(color: borderColor),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            "To-Do",
-            style: TextStyle(color: borderColor, fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyTask(String message) {
-    return Center(
-      child: Column(
-        children: [
-          Icon(Icons.assignment_turned_in, size: 80, color: Colors.grey[400]),
-          SizedBox(height: 8),
-          Text(
-            message,
-            style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-        ],
+            ],
+          );
+        }).toList(),
       ),
     );
   }

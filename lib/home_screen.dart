@@ -182,24 +182,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 10),
           ],
-          FloatingActionButton(
+           FloatingActionButton(
             heroTag: "mainFAB",
             backgroundColor: Color(0xFF0E1836),
-            onPressed: () {
-              if (!mounted) return;
-              setState(() {
-                _isFabExpanded = !_isFabExpanded;
-              });
-            },
+            onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
             shape: CircleBorder(),
             child: AnimatedSwitcher(
               duration: Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) {
-                return RotationTransition(turns: animation, child: child);
-              },
-              child: _isFabExpanded
-                  ? Icon(Icons.close, key: ValueKey('close'), color: Colors.white)
-                  : Icon(Icons.add, key: ValueKey('add'), color: Colors.white),
+              transitionBuilder: (child, animation) =>
+                  RotationTransition(turns: animation, child: child),
+              child: Icon(
+                _isFabExpanded ? Icons.close : Icons.add,
+                key: ValueKey(_isFabExpanded ? 'close' : 'add'),
+                color: Colors.white,
+              ),
             ),
           ),
         ],

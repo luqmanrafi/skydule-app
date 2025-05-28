@@ -3,16 +3,10 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../widgets/task_card.dart';
 import '../models/matakuliah.dart';
+import '../models/tugas.dart';
 import '../services/api_service.dart';
 
-// Data tugasHariIni masih statis, ini di luar scope refresh data matakuliah dari API
-final List<Map<String, dynamic>> tugasHariIni = [
-  {"title": "Laporan Praktikum Basis Data", "deadline": "21:00"},
-];
-
-// Kelas HomePage diubah jadi StatefulWidget jika belum (tapi di kode asli sudah)
 class HomePage extends StatefulWidget {
-  // Tambahkan Key di konstruktor agar bisa di-force rebuild dari HomeScreen jika diperlukan
   const HomePage({Key? key}) : super(key: key);
 
   @override
@@ -22,64 +16,56 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  Future<List<Matakuliah>>? _matakuliahFuture;
+  List<Matakuliah> semuaMatakuliah = [];
 
-
-  // futureMatakuliah akan kita ganti cara pakainya sedikit
-  // agar bisa di-re-assign untuk trigger FutureBuilder (jika dipakai)
-  // atau untuk nge-fetch ulang secara manual
-  Future<List<Matakuliah>>? _matakuliahFuture; // DIUBAH: Jadi nullable dan akan diisi di initState & refresh
-  List<Matakuliah> semuaMatakuliah = []; // Tetap untuk nyimpen hasil fetch
+  // ✅ Tambahan untuk Tugas
+  List<Map<String, dynamic>> tugasHariIni = [];
+  bool tugasKosong = false;
 
   @override
   void initState() {
     super.initState();
-    print("HomePage: initState dipanggil.");
-    _fetchMatakuliahData(); // DIPERBAIKI: Panggil fungsi fetch data yang baru
-    _selectedDay = DateTime.now(); // default pilih hari ini
+    _fetchMatakuliahData();
+    _selectedDay = DateTime.now();
+    fetchTugasHariIni(_selectedDay!);
+ // Panggil saat init
   }
 
-  // DITAMBAHKAN: Fungsi baru untuk fetch data matakuliah
-  // Fungsi ini bisa dipanggil ulang untuk refresh
   Future<void> _fetchMatakuliahData() async {
-    print("HomePage: Memulai _fetchMatakuliahData...");
-    if (!mounted) return; // Cek mounted sebelum setState
-
-    // Tunjukkan loading jika perlu (misalnya dengan variabel state isLoading)
-    // setState(() { _isLoading = true; }); // Jika mau ada indikator loading khusus
-
-    // Assign Future baru ke _matakuliahFuture untuk bisa dipakai FutureBuilder
-    // atau untuk nge-handle hasil fetch-nya di sini
-    _matakuliahFuture = ApiService.fetchMatakuliah(); //
+    if (!mounted) return;
+    _matakuliahFuture = ApiService.fetchMatakuliah();
 
     try {
-      final list = await _matakuliahFuture!; // Tunggu hasilnya
-      if (!mounted) return; // Cek mounted lagi setelah await
-
+      final list = await _matakuliahFuture!;
+      if (!mounted) return;
       setState(() {
         semuaMatakuliah = list;
-        // _isLoading = false; // Jika pakai _isLoading
       });
-      print("HomePage: _fetchMatakuliahData selesai, semuaMatakuliah di-update dengan ${list.length} item.");
     } catch (error) {
       if (!mounted) return;
-      print("HomePage: Error saat fetch matakuliah data: $error");
       setState(() {
-        semuaMatakuliah = []; // Kosongkan jika error atau beri pesan error
-        // _isLoading = false; // Jika pakai _isLoading
+        semuaMatakuliah = [];
       });
-      // Opsional: tampilkan SnackBar error
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Gagal memuat data matakuliah: $error')),
-      // );
     }
   }
+void fetchTugasHariIni(DateTime selectedDate) async {
+  final semuaTugas = await ApiService.fetchTugas();
+  final filtered = semuaTugas.where((tugas) {
+    final deadline = tugas.deadline;
+    return deadline.year == selectedDate.year &&
+        deadline.month == selectedDate.month &&
+        deadline.day == selectedDate.day;
+  }).toList();
 
-  // DITAMBAHKAN: Fungsi yang bisa dipanggil dari luar (misal dari HomeScreen) untuk refresh
-  // Ini contoh jika HomePage diakses via GlobalKey oleh HomeScreen
-  // void refreshData() {
-  //   print("HomePage: Menerima panggilan refreshData().");
-  //   _fetchMatakuliahData();
-  // }
+  setState(() {
+    tugasHariIni = filtered.map((tugas) => {
+      "title": tugas.judulTugas,
+      "deadline": DateFormat.Hm().format(tugas.deadline),
+    }).toList();
+    tugasKosong = tugasHariIni.isEmpty;
+  });
+}
 
   String getNamaHari(DateTime date) {
     return DateFormat('EEEE', 'id_ID').format(date);
@@ -87,7 +73,6 @@ class _HomePageState extends State<HomePage> {
 
   List<Matakuliah> filterMatakuliahByDate(DateTime date) {
     final namaHari = getNamaHari(date);
-    // Pastikan semuaMatakuliah tidak null sebelum di-filter
     return semuaMatakuliah.where((mk) => mk.hari == namaHari).toList();
   }
 
@@ -97,6 +82,7 @@ class _HomePageState extends State<HomePage> {
       _selectedDay = selectedDay;
       _focusedDay = focusedDay;
     });
+     fetchTugasHariIni(selectedDay);
   }
 
   void _changeMonth(bool next) {
@@ -105,18 +91,14 @@ class _HomePageState extends State<HomePage> {
       _focusedDay = DateTime(
         _focusedDay.year,
         next ? _focusedDay.month + 1 : _focusedDay.month - 1,
-        _focusedDay.day, // Tambahkan _focusedDay.day agar tanggal tidak reset ke 1
+        _focusedDay.day,
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    print("HomePage: build method dipanggil.");
-    // PERBAIKAN: Ambil tanggalDipilih dengan fallback ke _focusedDay jika _selectedDay null di awal
     final tanggalDipilih = _selectedDay ?? _focusedDay;
-    final jadwalHariIni = filterMatakuliahByDate(tanggalDipilih);
-    final tugasKosong = tugasHariIni.isEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -131,7 +113,7 @@ class _HomePageState extends State<HomePage> {
             _buildCalendar(),
             SizedBox(height: 20),
             Text(
-              "Jadwal Hari Ini (${DateFormat('d MMMM yyyy', 'id_ID').format(tanggalDipilih)})", // Tambah info tanggal
+              "Jadwal Hari Ini",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -139,31 +121,50 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             SizedBox(height: 16),
+            FutureBuilder<List<Matakuliah>>(
+              future: _matakuliahFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return TaskCard(
+                    title: "Gagal memuat data jadwal",
+                    time: "Silakan coba lagi nanti.",
+                    isTask: false,
+                  );
+                } else if (snapshot.hasData) {
+                  final list = snapshot.data!;
+                  final jadwalHariIni = list.where(
+                    (mk) => mk.hari == getNamaHari(tanggalDipilih),
+                  ).toList();
 
-            // DIPERBAIKI: Handle jika _matakuliahFuture masih null atau lagi loading
-            // Ini bisa diganti dengan FutureBuilder yang lebih proper jika mau
-            _matakuliahFuture == null // Jika future belum diinisialisasi (seharusnya tidak terjadi jika initState benar)
-                ? Center(child: Text("Memuat jadwal...")) // Atau CircularProgressIndicator
-                : jadwalHariIni.isEmpty && semuaMatakuliah.isNotEmpty // Jika sudah fetch tapi hari ini kosong
-                ? TaskCard(
-              title: "Tidak ada jadwal untuk hari ini",
-              time: "",
-              isTask: false,
-            )
-                : jadwalHariIni.isEmpty && semuaMatakuliah.isEmpty // Jika belum ada data sama sekali (mungkin masih loading awal atau error)
-                ? TaskCard(
-              title: "Belum ada data jadwal",
-              time: "Silakan coba refresh atau tambahkan jadwal baru.",
-              isTask: false,
-            )
-                : Column( // Gunakan Column jika ada item, atau widget lain jika kosong
-              children: jadwalHariIni.map((jadwal) => TaskCard(
-                title: jadwal.namaMatakuliah,
-                time: '${jadwal.jamMulai} - ${jadwal.jamSelesai}',
-                isTask: false,
-              )).toList(),
+                  if (jadwalHariIni.isEmpty) {
+                    return TaskCard(
+                      title: "Tidak ada jadwal untuk hari ini",
+                      time: "",
+                      isTask: false,
+                    );
+                  }
+
+                  return Column(
+                    children: jadwalHariIni.map((jadwal) => TaskCard(
+                      title: jadwal.namaMatakuliah,
+                      time: '${jadwal.jamMulai} - ${jadwal.jamSelesai}',
+                      isTask: false,
+                    )).toList(),
+                  );
+                } else {
+                  return TaskCard(
+                    title: "Belum ada data jadwal",
+                    time: "Silakan coba refresh atau tambahkan jadwal baru.",
+                    isTask: false,
+                  );
+                }
+              },
             ),
             SizedBox(height: 20),
+
+            // ✅ Tugas Hari Ini
             Text(
               "Tugas Hari Ini",
               style: TextStyle(
@@ -180,21 +181,16 @@ class _HomePageState extends State<HomePage> {
                 isTask: false,
               )
             else
-              ...tugasHariIni.map((tugas) => TaskCard(
-                title: tugas["title"],
-                time: "Deadline: ${tugas["deadline"]}",
-                isTask: true,
-              )),
+              Column(
+                children: tugasHariIni.map((tugas) => TaskCard(
+                  title: tugas["title"],
+                  time: "Deadline: ${tugas["deadline"]}",
+                  isTask: true,
+                )).toList(),
+              ),
           ],
         ),
       ),
-      // DITAMBAHKAN: FloatingActionButton untuk refresh manual (buat ngetes)
-      // Ini bisa dihapus kalo refresh otomatis dari HomeScreen udah jalan
-      // floatingActionButton: FloatingActionButton(
-      //   onPressed: _fetchMatakuliahData,
-      //   tooltip: 'Refresh Jadwal',
-      //   child: Icon(Icons.refresh),
-      // ),
     );
   }
 
@@ -217,7 +213,7 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                DateFormat('MMMM yyyy', 'id_ID').format(_focusedDay), // Diubah jadi MMMM yyyy
+                DateFormat('MMMM yyyy', 'id_ID').format(_focusedDay),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -241,15 +237,14 @@ class _HomePageState extends State<HomePage> {
           TableCalendar(
             locale: 'id_ID',
             focusedDay: _focusedDay,
-            firstDay: DateTime.utc(2000), // DIUBAH: Pake DateTime.utc biar konsisten
-            lastDay: DateTime.utc(2100),  // DIUBAH: Pake DateTime.utc
-            selectedDayPredicate: (day) => isSameDay(day, _selectedDay ?? _focusedDay), // PERBAIKAN: Fallback ke _focusedDay
+            firstDay: DateTime.utc(2000),
+            lastDay: DateTime.utc(2100),
+            selectedDayPredicate: (day) => isSameDay(day, _selectedDay ?? _focusedDay),
             onDaySelected: _onDaySelected,
             calendarFormat: CalendarFormat.month,
-            headerVisible: false, // Header TableCalendar sendiri disembunyikan, kita pake header custom di atas
+            headerVisible: false,
             daysOfWeekStyle: DaysOfWeekStyle(
               dowTextFormatter: (date, locale) {
-                // Menggunakan nama hari pendek dari DateFormat Indonesia
                 return DateFormat.E(locale).format(date);
               },
               weekdayStyle: TextStyle(color: Color(0xFF1E2A47)),
@@ -262,7 +257,7 @@ class _HomePageState extends State<HomePage> {
               ),
               outsideTextStyle: TextStyle(color: Colors.grey),
               todayDecoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.5), // Sedikit transparan
+                color: Colors.blue.withOpacity(0.5),
                 shape: BoxShape.circle,
               ),
               todayTextStyle: TextStyle(
@@ -277,18 +272,13 @@ class _HomePageState extends State<HomePage> {
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
-              weekendTextStyle: TextStyle(color: Colors.redAccent), // Pastikan ini juga ada
+              weekendTextStyle: TextStyle(color: Colors.redAccent),
             ),
-            // DITAMBAHKAN: Callback saat halaman kalender berubah (misal ganti bulan)
-            // Ini bisa dipake buat nge-fetch data kalo jadwal per bulan lo banyak dan mau di-load per bulan
-            // Untuk sekarang, _focusedDay di-update oleh _changeMonth, dan build akan nge-filter ulang
             onPageChanged: (focusedDay) {
               if (!mounted) return;
               setState(() {
                 _focusedDay = focusedDay;
               });
-              // Jika lo mau nge-fetch data lagi pas ganti bulan:
-              // _fetchMatakuliahData();
             },
           ),
         ],
